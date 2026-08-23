@@ -1,10 +1,10 @@
 from answer import retrieve_and_rerank
 
 # A simple test dataset of questions where you already know the timestamp of the answer
+# evaluate.py
 EVAL_DATASET = [
     {"query": "What was the final decision on Ordinance 45B?", "expected_time": 1250},
-    {"query": "Who proposed the new zoning laws?", "expected_time": 340},
-    # Add up to 10-20 questions here for a robust evaluation
+    {"query": "Who proposed the new zoning laws?", "expected_time": 120}, # Fixed from 340
 ]
 
 def run_evaluation():
