@@ -1,4 +1,5 @@
 import os
+import uuid
 from fastembed import SparseTextEmbedding, TextEmbedding
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
@@ -10,11 +11,11 @@ def get_qdrant_client():
     """
     qdrant_url = os.getenv("QDRANT_URL")
     qdrant_api_key = os.getenv("QDRANT_API_KEY")
-    
+
     if qdrant_url and qdrant_api_key:
         print("Connecting to Hosted Qdrant Cluster...")
         return QdrantClient(url=qdrant_url, api_key=qdrant_api_key)
-    
+
     print("Connecting to Local Qdrant Database...")
     return QdrantClient(path=QDRANT_PATH)
 
@@ -23,12 +24,12 @@ def index_documents(chunks):
     Embeds and indexes documents using hybrid search (Dense + Sparse/BM25).
     """
     client = get_qdrant_client()
-    
+
     docs = [chunk["text"] for chunk in chunks]
     metadata = [{"start": chunk["start_time"]} for chunk in chunks]
     if not docs:
         return client
-    
+
     print(f"Indexing {len(docs)} chunks into Qdrant...")
 
     dense_embeddings = list(TextEmbedding(model_name=EMBEDDING_MODEL).embed(docs))
@@ -65,7 +66,7 @@ def index_documents(chunks):
         collection_name=COLLECTION_NAME,
         points=[
             models.PointStruct(
-                id=point_id,
+                id=str(uuid.uuid4()),
                 vector={
                     "dense": dense_embedding.tolist(),
                     "sparse": models.SparseVector(
@@ -79,6 +80,6 @@ def index_documents(chunks):
             in enumerate(zip(dense_embeddings, sparse_embeddings))
         ],
     )
-    
+
     print("Indexing complete!")
     return client
