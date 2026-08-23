@@ -1,12 +1,17 @@
-import google.generativeai as genai
-from fastembed import TextEmbedding
+import os
+from fastembed import SparseTextEmbedding, TextEmbedding
+from google import genai
+from google.genai import types
 from fastembed.rerank.cross_encoder import TextCrossEncoder
-from config import EMBEDDING_MODEL, RERANKER_MODEL, LLM_MODEL
+from qdrant_client.http import models
+from config import RERANKER_MODEL, LLM_MODEL, GEMINI_API_KEY
 from index import get_qdrant_client, COLLECTION_NAME
+from config import EMBEDDING_MODEL, SPARSE_MODEL
 
 # Load the reranker (runs locally, very accurate)
-reranker = TextCrossEncoder(model_name=RERANKER_MODEL) #
-embedding_model = TextEmbedding(model_name=EMBEDDING_MODEL)
+reranker = TextCrossEncoder(model_name=RERANKER_MODEL) 
+dense_embedding_model = TextEmbedding(model_name=EMBEDDING_MODEL)
+sparse_embedding_model = SparseTextEmbedding(model_name=SPARSE_MODEL)
 
 def retrieve_and_rerank(query: str):
     """
@@ -14,18 +19,29 @@ def retrieve_and_rerank(query: str):
     """
     client = get_qdrant_client()
     
-    # STAGE 1: Fast Hybrid Search (gets top 20 candidates)
-    query_vector = next(embedding_model.embed([query])).tolist()
+    dense_query = next(dense_embedding_model.embed([query])).tolist()
+    sparse_query = next(sparse_embedding_model.embed([query]))
+
+    # STAGE 1: retrieve with both dense meaning and sparse keyword signals.
     candidates = client.query_points(
         collection_name=COLLECTION_NAME,
-        query=query_vector,
-        limit=20
+        prefetch=[
+            models.Prefetch(query=dense_query, using="dense", limit=20),
+            models.Prefetch(
+                query=models.SparseVector(
+                    indices=sparse_query.indices.tolist(),
+                    values=sparse_query.values.tolist(),
+                ),
+                using="sparse",
+                limit=20,
+            ),
+        ],
+        query=models.FusionQuery(fusion=models.Fusion.RRF),
+        limit=20,
     ).points
     
     candidate_texts = [hit.payload["document"] for hit in candidates]
-    candidate_metadata = [
-        {"start": hit.payload["start"]} for hit in candidates
-    ]
+    candidate_metadata = [{"start": hit.payload["start"]} for hit in candidates]
     
     # STAGE 2: Deep Cross-Encoder Reranking
     scores = list(reranker.rerank(query, candidate_texts))
@@ -39,7 +55,7 @@ def retrieve_and_rerank(query: str):
 
 def ask_gemini(query: str, context_chunks):
     """
-    Passes the strict top-3 context chunks to the Gemini API.
+    Passes the strict top-3 context chunks to the Gemini API using the modern SDK.
     """
     context_string = "\n\n".join(
         [f"[Timestamp: {chunk[2]['start']}s] {chunk[1]}" for chunk in context_chunks]
@@ -49,12 +65,18 @@ def ask_gemini(query: str, context_chunks):
         "You are a municipal policy analyst. Answer the user's question "
         "based ONLY on the provided meeting transcripts. If the answer is not "
         "in the transcripts, state that you do not know. Always cite the timestamp."
-    ) #[cite: 1]
+    ) 
     
-    model = genai.GenerativeModel(
-        model_name=LLM_MODEL,
-        system_instruction=system_prompt
+    # Initialize the modern GenAI client
+    client = genai.Client(api_key=GEMINI_API_KEY)
+    
+    # Generate content using the proper new syntax
+    response = client.models.generate_content(
+        model=LLM_MODEL,
+        contents=f"Context:\n{context_string}\n\nQuestion: {query}",
+        config=types.GenerateContentConfig(
+            system_instruction=system_prompt,
+        )
     )
     
-    response = model.generate_content(f"Context:\n{context_string}\n\nQuestion: {query}")
     return response.text

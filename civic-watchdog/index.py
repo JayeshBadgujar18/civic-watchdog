@@ -1,5 +1,5 @@
 import os
-from fastembed import TextEmbedding
+from fastembed import SparseTextEmbedding, TextEmbedding
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
 from config import COLLECTION_NAME, EMBEDDING_MODEL, SPARSE_MODEL, QDRANT_PATH
@@ -23,24 +23,42 @@ def index_documents(chunks):
     Embeds and indexes documents using hybrid search (Dense + Sparse/BM25).
     """
     client = get_qdrant_client()
-
-    docs = [chunk["text"] for chunk in chunks] #[cite: 1]
-    metadata = [{"start": chunk["start_time"]} for chunk in chunks] #[cite: 1]
-
+    
+    docs = [chunk["text"] for chunk in chunks]
+    metadata = [{"start": chunk["start_time"]} for chunk in chunks]
+    if not docs:
+        return client
+    
     print(f"Indexing {len(docs)} chunks into Qdrant...")
 
-    embedding_model = TextEmbedding(model_name=EMBEDDING_MODEL)
-    embeddings = list(embedding_model.embed(docs))
-    if not embeddings:
-        return client
+    dense_embeddings = list(TextEmbedding(model_name=EMBEDDING_MODEL).embed(docs))
+    sparse_embeddings = list(SparseTextEmbedding(model_name=SPARSE_MODEL).embed(docs))
+
+    if client.collection_exists(COLLECTION_NAME):
+        collection = client.get_collection(COLLECTION_NAME)
+        vectors = collection.config.params.vectors
+        sparse_vectors = collection.config.params.sparse_vectors
+        is_hybrid = (
+            isinstance(vectors, dict)
+            and "dense" in vectors
+            and sparse_vectors is not None
+            and "sparse" in sparse_vectors
+        )
+        if not is_hybrid:
+            client.delete_collection(COLLECTION_NAME)
 
     if not client.collection_exists(COLLECTION_NAME):
         client.create_collection(
             collection_name=COLLECTION_NAME,
-            vectors_config=models.VectorParams(
-                size=len(embeddings[0]),
-                distance=models.Distance.COSINE,
-            ),
+            vectors_config={
+                "dense": models.VectorParams(
+                    size=len(dense_embeddings[0]),
+                    distance=models.Distance.COSINE,
+                )
+            },
+            sparse_vectors_config={
+                "sparse": models.SparseVectorParams(modifier=models.Modifier.IDF)
+            },
         )
 
     client.upsert(
@@ -48,10 +66,17 @@ def index_documents(chunks):
         points=[
             models.PointStruct(
                 id=point_id,
-                vector=embedding.tolist(),
+                vector={
+                    "dense": dense_embedding.tolist(),
+                    "sparse": models.SparseVector(
+                        indices=sparse_embedding.indices.tolist(),
+                        values=sparse_embedding.values.tolist(),
+                    ),
+                },
                 payload={**metadata[point_id], "document": docs[point_id]},
             )
-            for point_id, embedding in enumerate(embeddings)
+            for point_id, (dense_embedding, sparse_embedding)
+            in enumerate(zip(dense_embeddings, sparse_embeddings))
         ],
     )
     

@@ -3,36 +3,30 @@ def create_overlapping_chunks(segments, chunk_length=60, overlap=15):
     Groups faster-whisper segments into time-based overlapping chunks.
     This solves the context overflow and broken sentence problem.
     """
+    segments = list(segments)
+    if not segments:
+        return []
+    if overlap < 0 or overlap >= chunk_length:
+        raise ValueError("overlap must be >= 0 and smaller than chunk_length")
+
     chunks = []
-    current_chunk_text = []
-    chunk_start_time = None
-    
-    for segment in segments:
-        if chunk_start_time is None:
-            chunk_start_time = segment.start
-            
-        current_chunk_text.append(segment.text.strip())
-        
-        # If the current accumulated time exceeds our chunk_length (e.g., 60 seconds)
-        if segment.end - chunk_start_time >= chunk_length:
+    step = chunk_length - overlap
+    first_start = segments[0].start
+    final_end = segments[-1].end
+    chunk_start = first_start
+
+    while chunk_start < final_end:
+        chunk_end = chunk_start + chunk_length
+        window_segments = [
+            segment for segment in segments
+            if segment.start < chunk_end and segment.end > chunk_start
+        ]
+        if window_segments:
             chunks.append({
-                "text": " ".join(current_chunk_text),
-                "start_time": chunk_start_time,
-                "end_time": segment.end
+                "text": " ".join(segment.text.strip() for segment in window_segments),
+                "start_time": chunk_start,
+                "end_time": min(chunk_end, final_end),
             })
-            
-            # Step back to create the overlap (e.g., keep the last 15 seconds of text)
-            # For simplicity in this script, we reset and let the next segment begin,
-            # but in a true sliding window, you retain the trailing segments.
-            current_chunk_text = [segment.text.strip()]
-            chunk_start_time = segment.start
-            
-    # Catch any remaining text at the end of the video
-    if current_chunk_text:
-        chunks.append({
-            "text": " ".join(current_chunk_text),
-            "start_time": chunk_start_time,
-            "end_time": segments[-1].end if segments else chunk_start_time
-        })
-        
+        chunk_start += step
+
     return chunks
