@@ -1,10 +1,12 @@
 import google.generativeai as genai
+from fastembed import TextEmbedding
 from fastembed.rerank.cross_encoder import TextCrossEncoder
-from config import RERANKER_MODEL, LLM_MODEL
+from config import EMBEDDING_MODEL, RERANKER_MODEL, LLM_MODEL
 from index import get_qdrant_client, COLLECTION_NAME
 
 # Load the reranker (runs locally, very accurate)
 reranker = TextCrossEncoder(model_name=RERANKER_MODEL) #
+embedding_model = TextEmbedding(model_name=EMBEDDING_MODEL)
 
 def retrieve_and_rerank(query: str):
     """
@@ -13,14 +15,17 @@ def retrieve_and_rerank(query: str):
     client = get_qdrant_client()
     
     # STAGE 1: Fast Hybrid Search (gets top 20 candidates)
-    candidates = client.query(
+    query_vector = next(embedding_model.embed([query])).tolist()
+    candidates = client.query_points(
         collection_name=COLLECTION_NAME,
-        query_text=query,
+        query=query_vector,
         limit=20
-    ) #
+    ).points
     
-    candidate_texts = [hit.document for hit in candidates] #
-    candidate_metadata = [hit.metadata for hit in candidates]
+    candidate_texts = [hit.payload["document"] for hit in candidates]
+    candidate_metadata = [
+        {"start": hit.payload["start"]} for hit in candidates
+    ]
     
     # STAGE 2: Deep Cross-Encoder Reranking
     scores = list(reranker.rerank(query, candidate_texts))

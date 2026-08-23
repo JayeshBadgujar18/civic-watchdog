@@ -1,5 +1,7 @@
 import os
+from fastembed import TextEmbedding
 from qdrant_client import QdrantClient
+from qdrant_client.http import models
 from config import COLLECTION_NAME, EMBEDDING_MODEL, SPARSE_MODEL, QDRANT_PATH
 
 def get_qdrant_client():
@@ -21,25 +23,37 @@ def index_documents(chunks):
     Embeds and indexes documents using hybrid search (Dense + Sparse/BM25).
     """
     client = get_qdrant_client()
-    
-    # 1. Set the meaning model (Dense)
-    client.set_model(EMBEDDING_MODEL) #
-    
-    # 2. Set the exact-keyword model (Sparse/BM25)
-    client.set_sparse_model(SPARSE_MODEL) #[cite: 1]
-    
-    # Format data for Qdrant
+
     docs = [chunk["text"] for chunk in chunks] #[cite: 1]
     metadata = [{"start": chunk["start_time"]} for chunk in chunks] #[cite: 1]
-    
+
     print(f"Indexing {len(docs)} chunks into Qdrant...")
-    
-    # Qdrant handles embedding both dense and sparse types automatically
-    client.add(
+
+    embedding_model = TextEmbedding(model_name=EMBEDDING_MODEL)
+    embeddings = list(embedding_model.embed(docs))
+    if not embeddings:
+        return client
+
+    if not client.collection_exists(COLLECTION_NAME):
+        client.create_collection(
+            collection_name=COLLECTION_NAME,
+            vectors_config=models.VectorParams(
+                size=len(embeddings[0]),
+                distance=models.Distance.COSINE,
+            ),
+        )
+
+    client.upsert(
         collection_name=COLLECTION_NAME,
-        documents=docs,
-        metadata=metadata
-    ) #[cite: 1]
+        points=[
+            models.PointStruct(
+                id=point_id,
+                vector=embedding.tolist(),
+                payload={**metadata[point_id], "document": docs[point_id]},
+            )
+            for point_id, embedding in enumerate(embeddings)
+        ],
+    )
     
     print("Indexing complete!")
     return client
