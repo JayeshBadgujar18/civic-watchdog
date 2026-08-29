@@ -19,14 +19,17 @@ def get_qdrant_client():
     print("Connecting to Local Qdrant Database...")
     return QdrantClient(path=QDRANT_PATH)
 
-def index_documents(chunks):
+def index_documents(chunks, source_name="Unknown source"):
     """
     Embeds and indexes documents using hybrid search (Dense + Sparse/BM25).
     """
     client = get_qdrant_client()
 
     docs = [chunk["text"] for chunk in chunks]
-    metadata = [{"start": chunk["start_time"]} for chunk in chunks]
+    metadata = [
+        {"start": chunk["start_time"], "end": chunk.get("end_time"), "source": source_name}
+        for chunk in chunks
+    ]
     if not docs:
         return client
 

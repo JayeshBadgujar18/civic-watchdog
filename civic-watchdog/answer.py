@@ -40,14 +40,29 @@ def retrieve_and_rerank(query: str):
         limit=20,
     ).points
     
-    candidate_texts = [hit.payload["document"] for hit in candidates]
-    candidate_metadata = [{"start": hit.payload["start"]} for hit in candidates]
+    valid_candidates = [
+        hit for hit in candidates
+        if hit.payload and hit.payload.get("document") is not None
+    ]
+    candidate_texts = [hit.payload["document"] for hit in valid_candidates]
+    candidate_metadata = [
+        {
+            "start": hit.payload.get("start", 0),
+            "end": hit.payload.get("end"),
+            "source": hit.payload.get("source", "Unknown source"),
+        }
+        for hit in valid_candidates
+    ]
     
     # STAGE 2: Deep Cross-Encoder Reranking
     scores = list(reranker.rerank(query, candidate_texts))
     
     # Sort candidates by their reranker score in descending order
-    scored_candidates = sorted(zip(scores, candidate_texts, candidate_metadata), reverse=True)
+    scored_candidates = sorted(
+        zip(scores, candidate_texts, candidate_metadata),
+        key=lambda item: item[0],
+        reverse=True,
+    )
     
     # Extract the absolute best 3 chunks
     top_3 = scored_candidates[:3]
@@ -58,7 +73,10 @@ def ask_gemini(query: str, context_chunks):
     Passes the strict top-3 context chunks to the Gemini API using the modern SDK.
     """
     context_string = "\n\n".join(
-        [f"[Timestamp: {chunk[2]['start']}s] {chunk[1]}" for chunk in context_chunks]
+        [
+            f"[Source: {chunk[2]['source']} | Timestamp: {chunk[2]['start']}s] {chunk[1]}"
+            for chunk in context_chunks
+        ]
     )
     
     system_prompt = (
