@@ -4,6 +4,7 @@ import { ArrowUp, ChevronDown, FileAudio, FileText, FolderOpen, LoaderCircle, Pl
 import './styles.css'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const mono = 'font-[DM_Mono] uppercase tracking-[0.07em]'
 
 function formatTime(seconds) {
   if (!Number.isFinite(seconds)) return '00:00'
@@ -25,16 +26,12 @@ function App() {
   async function askQuestion(event) {
     event.preventDefault()
     if (!question.trim() || loading) return
-    setLoading(true)
-    setNotice('')
+    setLoading(true); setNotice('')
     try {
-      const response = await fetch(`${API_URL}/api/ask`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: question }),
-      })
+      const response = await fetch(`${API_URL}/api/ask`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: question }) })
       const data = await response.json()
       if (!response.ok) throw new Error(data.detail || 'The watchdog could not answer.')
-      setAnswer(data.answer)
-      setCitations(data.citations || [])
+      setAnswer(data.answer); setCitations(data.citations || [])
     } catch (error) { setNotice(error.message) } finally { setLoading(false) }
   }
 
@@ -53,39 +50,37 @@ function App() {
   }
 
   return (
-    <div className="app-shell">
-      <header className="topbar">
-        <a className="brand" href="/"><span className="brand-mark"><Shield size={19} /></span><span>Civic <b>Watchdog</b></span></a>
-        <div className="status"><span className="status-dot" /> Knowledge base live</div>
-        <button className="icon-button" title="Open sources" onClick={() => document.querySelector('.source-panel')?.scrollIntoView({ behavior: 'smooth' })}><FolderOpen size={18} /></button>
+    <div className="min-h-screen bg-[#f5f3ed] text-[#18221e] [background-image:radial-gradient(circle_at_80%_10%,#e6eee7_0,transparent_32%)]">
+      <header className="mx-auto flex h-[76px] max-w-[1240px] items-center gap-6 border-b border-[#dce0d8] px-5 sm:px-8">
+        <a className="flex flex-1 items-center gap-2.5 font-medium tracking-[-0.02em] no-underline" href="/"><span className="grid size-[34px] place-items-center rounded-lg bg-[#183d35] text-[#e9f0e8]"><Shield size={19} /></span><span>Civic <b>Watchdog</b></span></a>
+        <div className={`${mono} hidden text-[11px] text-[#627168] sm:block`}><span className="mr-2 inline-block size-[7px] rounded-full bg-[#37a26c] shadow-[0_0_0_4px_#dcece0]" />Knowledge base live</div>
+        <button className="grid size-9 place-items-center rounded-full border border-[#d1d9d1] bg-transparent text-[#456057]" title="Open sources" onClick={() => document.querySelector('.source-panel')?.scrollIntoView({ behavior: 'smooth' })}><FolderOpen size={18} /></button>
       </header>
 
-      <main className="workspace">
-        <section className="intro">
-          <p className="eyebrow"><Sparkles size={14} /> PUBLIC RECORDS, MADE SEARCHABLE</p>
-          <h1>Ask what happened<br /><em>in the room.</em></h1>
-          <p className="lede">Search your council meeting videos and transcripts for the detail that matters. Every answer stays tied to its source.</p>
+      <main className="mx-auto max-w-[1240px] px-5 pb-[70px] pt-[54px] sm:px-8 sm:pt-[82px]">
+        <section className="max-w-[670px]">
+          <p className={`${mono} mb-5 flex items-center gap-2 text-[11px] text-[#39765d]`}><Sparkles size={14} /> PUBLIC RECORDS, MADE SEARCHABLE</p>
+          <h1 className="max-w-[760px] font-[Fraunces] text-[55px] font-medium leading-[0.96] tracking-[-0.055em] sm:text-[clamp(48px,7vw,88px)]">Ask what happened<br /><em className="text-[#4d876c] not-italic">in the room.</em></h1>
+          <p className="mt-[26px] max-w-[530px] text-[17px] leading-[1.55] text-[#65716a]">Search your council meeting videos and transcripts for the detail that matters. Every answer stays tied to its source.</p>
         </section>
 
-        <section className="ask-panel">
-          <div className="panel-label"><span>Ask the record</span><kbd>⌘ K</kbd></div>
-          <form onSubmit={askQuestion}>
-            <div className="question-row"><Search size={22} /><input value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="What did the committee decide about..." aria-label="Ask a question" /><button className="submit-button" type="submit" disabled={loading || !question.trim()}>{loading ? <LoaderCircle className="spin" size={19} /> : <ArrowUp size={19} />}</button></div>
-          </form>
-          <div className="suggestions"><span>Try asking</span><button onClick={() => setQuestion('What was the man protesting during his public comment?')}>public comment topics</button><button onClick={() => setQuestion('What was the final decision?')}>final decisions</button></div>
+        <section className="mt-10 max-w-[860px] border border-[#d9ded7] bg-[#fffefa] p-[18px_14px_15px] shadow-[0_14px_40px_#263b3210] sm:mt-[54px] sm:p-[22px_24px_18px]">
+          <div className={`${mono} mb-3.5 flex justify-between text-[11px] text-[#718078]`}><span>Ask the record</span><kbd className="font-inherit text-[10px] text-[#8a948d]">⌘ K</kbd></div>
+          <form onSubmit={askQuestion}><div className="flex items-center gap-3 border border-[#ccd5cd] p-1.5 pl-3.5 text-[#7b8b82] focus-within:border-[#39765d]"><Search size={22} /><input className="min-w-0 flex-1 bg-transparent py-2.5 text-base text-[#18221e] outline-none placeholder:text-[#99a39c]" value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="What did the committee decide about..." aria-label="Ask a question" /><button className="grid size-[42px] place-items-center rounded bg-[#183d35] text-white transition-opacity disabled:cursor-default disabled:opacity-35" type="submit" disabled={loading || !question.trim()}>{loading ? <LoaderCircle className="animate-spin" size={19} /> : <ArrowUp size={19} />}</button></div></form>
+          <div className="mt-[15px] flex flex-wrap items-center gap-2 text-xs text-[#8c9790]"><span>Try asking</span><button className="rounded-full border border-[#d6e3d7] bg-[#edf3ed] px-2.5 py-1 text-xs text-[#4e6d5d]" onClick={() => setQuestion('What was the man protesting during his public comment?')}>public comment topics</button><button className="rounded-full border border-[#d6e3d7] bg-[#edf3ed] px-2.5 py-1 text-xs text-[#4e6d5d]" onClick={() => setQuestion('What was the final decision?')}>final decisions</button></div>
         </section>
 
-        {notice && <div className="notice"><span>{notice}</span><button title="Dismiss" onClick={() => setNotice('')}><X size={16} /></button></div>}
+        {notice && <div className="mt-3.5 flex max-w-[860px] justify-between gap-4 border border-[#ecd9bd] bg-[#fff5e7] px-4 py-3 text-[13px] text-[#855d38]"><span>{notice}</span><button title="Dismiss" onClick={() => setNotice('')}><X size={16} /></button></div>}
 
-        <section className="results-grid">
-          <div className="answer-column">
-            {answer ? <article className="answer-card"><div className="answer-heading"><span className="answer-icon"><Sparkles size={16} /></span><span>Watchdog answer</span></div><p className="answer-text">{answer}</p><div className="answer-foot">Generated from {citations.length} transcript {citations.length === 1 ? 'source' : 'sources'}</div></article> : <div className="empty-answer"><div className="empty-icon"><Search size={22} /></div><h2>Your answer will appear here</h2><p>Ask a question to search across every indexed meeting.</p></div>}
-            {citations.length > 0 && <div className="citations"><div className="section-heading"><span>Evidence</span><span className="count">{citations.length} excerpts</span></div>{citations.map((citation, index) => <details className="citation" key={`${citation.source}-${citation.start}-${index}`} open={index === 0}><summary><span className="citation-time">{formatTime(citation.start)}</span><span className="citation-source">{citation.source}</span><ChevronDown size={17} /></summary><p>{citation.text}</p></details>)}</div>}
+        <section className="mt-[52px] grid gap-[54px] lg:mt-[67px] lg:grid-cols-[minmax(0,1fr)_310px] lg:gap-[62px]">
+          <div className="min-w-0">
+            {answer ? <article className="bg-[#183d35] p-[26px_22px] text-[#edf4ec] sm:p-[26px_28px]"><div className={`${mono} flex items-center gap-2 text-[11px] text-[#9ac7a8]`}><span className="grid size-[25px] place-items-center rounded-full bg-[#a9d4ad] text-[#183d35]"><Sparkles size={16} /></span>Watchdog answer</div><p className="my-[25px] font-[Fraunces] text-[23px] leading-[1.3] tracking-[-0.02em] sm:text-[27px]">{answer}</p><div className={`${mono} border-t border-[#416257] pt-[15px] text-[10px] text-[#91b2a0]`}>Generated from {citations.length} transcript {citations.length === 1 ? 'source' : 'sources'}</div></article> : <div className="border-y border-[#d5ddd5] py-[46px]"><div className="mb-5 grid size-11 place-items-center rounded-full bg-[#e3eee4] text-[#39765d]"><Search size={22} /></div><h2 className="mb-2 font-[Fraunces] text-[27px] font-medium">Your answer will appear here</h2><p className="text-[#7a867e]">Ask a question to search across every indexed meeting.</p></div>}
+            {citations.length > 0 && <div className="mt-11"><div className={`${mono} flex justify-between border-b border-[#cfd8d0] pb-[13px] text-[11px] text-[#51635a]`}><span>Evidence</span><span className="text-[#9ba59e]">{citations.length} excerpts</span></div>{citations.map((citation, index) => <details className="border-b border-[#d8ded8]" key={`${citation.source}-${citation.start}-${index}`} open={index === 0}><summary className="flex cursor-pointer items-center gap-3.5 px-1 py-[17px]"><span className="rounded-[3px] bg-[#e3eee4] px-2 py-1 font-[DM_Mono] text-[11px] text-[#39765d]">{formatTime(citation.start)}</span><span className="truncate text-sm text-[#4a5c53]">{citation.source}</span><ChevronDown className="citation-chevron ml-auto text-[#8b978e] transition-transform" size={17} /></summary><p className="pb-5 pl-[45px] pr-2 text-sm leading-[1.55] text-[#68766e]">{citation.text}</p></details>)}</div>}
           </div>
-          <aside className="source-panel"><div className="section-heading"><span>Sources</span><span className="count">{sources.length || '—'}</span></div><label className="upload-box"><input ref={fileInput} type="file" accept=".txt,.md,.mp3,.mp4,.wav,.m4a,.webm,.mov" onChange={uploadFile} /><span className="upload-icon">{uploading ? <LoaderCircle className="spin" size={20} /> : <Upload size={20} />}</span><strong>{uploading ? 'Indexing file...' : 'Add a meeting'}</strong><small>Drop a video or transcript here</small></label><div className="source-list">{sources.length ? sources.map((source) => <div className="source-item" key={`${source.name}-${source.chunks}`}><span className="file-icon">{source.name.match(/\.(mp3|mp4|wav|m4a|webm|mov)$/i) ? <FileAudio size={17} /> : <FileText size={17} />}</span><span><b>{source.name}</b><small>{source.chunks} indexed chunks</small></span></div>) : <p className="source-empty">Your indexed meetings will show up here.</p>}</div><button className="add-button" onClick={() => fileInput.current?.click()}><Plus size={16} /> Add source</button></aside>
+          <aside className="source-panel self-start lg:pt-0"><div className={`${mono} flex justify-between border-b border-[#cfd8d0] pb-[13px] text-[11px] text-[#51635a]`}><span>Sources</span><span className="text-[#9ba59e]">{sources.length || '—'}</span></div><label className="mt-[19px] flex cursor-pointer flex-col items-center border border-dashed border-[#aebfaf] bg-[#e8f0e7] px-[15px] py-7 text-center text-[#4d6659]"><input className="hidden" ref={fileInput} type="file" accept=".txt,.md,.mp3,.mp4,.wav,.m4a,.webm,.mov" onChange={uploadFile} /><span className="mb-3 grid size-10 place-items-center rounded-full bg-[#d5e7d5] text-[#39765d]">{uploading ? <LoaderCircle className="animate-spin" size={20} /> : <Upload size={20} />}</span><strong className="text-sm font-semibold">{uploading ? 'Indexing file...' : 'Add a meeting'}</strong><small className="mt-1 text-xs text-[#829188]">Drop a video or transcript here</small></label><div className="mt-[18px] min-h-[60px]">{sources.length ? sources.map((source) => <div className="flex gap-2.5 border-b border-[#d8ded8] py-3" key={`${source.name}-${source.chunks}`}><span className="text-[#39765d]">{source.name.match(/\.(mp3|mp4|wav|m4a|webm|mov)$/i) ? <FileAudio size={17} /> : <FileText size={17} />}</span><span className="min-w-0"><b className="block truncate text-[13px] font-medium text-[#45584e]">{source.name}</b><small className="mt-1 block text-[11px] text-[#909a93]">{source.chunks} indexed chunks</small></span></div>) : <p className="mt-1 text-[11px] text-[#909a93]">Your indexed meetings will show up here.</p>}</div><button className="mt-4 flex w-full items-center justify-center gap-1.5 border border-[#b7c8b9] bg-transparent p-2.5 text-[13px] text-[#39765d]" onClick={() => fileInput.current?.click()}><Plus size={16} /> Add source</button></aside>
         </section>
       </main>
-      <footer><span>Built for clearer local government.</span><span>Private by default <span className="footer-dot">•</span> Source-linked answers</span></footer>
+      <footer className={`${mono} mx-auto flex max-w-[1240px] flex-col gap-2.5 px-5 pb-[30px] pt-5 text-[10px] text-[#9aa49d] sm:flex-row sm:justify-between sm:px-8`}><span>Built for clearer local government.</span><span>Private by default <span className="px-2 text-[#4d876c]">•</span> Source-linked answers</span></footer>
     </div>
   )
 }

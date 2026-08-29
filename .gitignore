@@ -17,3 +17,19 @@ cookies.txt
 
 # VS Code
 .vscode/
+
+# Node/Frontend
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+# Local Databases
+civic_db_probe*
+*.db
+*.sqlite
+*.sqlite3
+
+# Media Files
+*.mp3
+*.wav
+*.mp4
