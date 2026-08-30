@@ -6,16 +6,18 @@ from pathlib import Path
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from starlette.concurrency import run_in_threadpool
 
 from answer import ask_gemini, retrieve_and_rerank
-from chunk import create_overlapping_chunks
+from chunk import create_overlapping_chunks, create_text_chunks
+from config import CORS_ORIGINS, MAX_UPLOAD_BYTES
 from index import index_documents
 from transcribe import transcribe_meeting
 
 app = FastAPI(title="Civic Watchdog API")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -54,6 +56,30 @@ def ask(request: AskRequest):
     return {"answer": answer, "citations": citations}
 
 
+def process_upload(file_bytes, filename, suffix):
+    if suffix in {".txt", ".md"}:
+        text = file_bytes.decode("utf-8", errors="replace").strip()
+        if not text:
+            raise ValueError("The transcript is empty.")
+        chunks = create_text_chunks(text)
+    else:
+        temp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
+                temp_file.write(file_bytes)
+                temp_path = temp_file.name
+            segments = transcribe_meeting(temp_path)
+            chunks = create_overlapping_chunks(segments)
+            if not chunks:
+                raise ValueError("No speech was found in the file.")
+        finally:
+            if temp_path:
+                os.unlink(temp_path)
+
+    index_documents(chunks, source_name=filename)
+    return chunks
+
+
 @app.post("/api/ingest")
 async def ingest(file: UploadFile = File(...)):
     filename = Path(file.filename or "upload").name
@@ -62,30 +88,16 @@ async def ingest(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="Upload a transcript or supported audio/video file.")
 
     upload_id = str(uuid.uuid4())
-    temp_path = None
     try:
-        if suffix in {".txt", ".md"}:
-            text = (await file.read()).decode("utf-8", errors="replace").strip()
-            if not text:
-                raise HTTPException(status_code=400, detail="The transcript is empty.")
-            chunks = [
-                {"text": text, "start_time": 0, "end_time": 0}
-            ]
-        else:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
-                temp_file.write(await file.read())
-                temp_path = temp_file.name
-            segments = transcribe_meeting(temp_path)
-            chunks = create_overlapping_chunks(segments)
-            if not chunks:
-                raise HTTPException(status_code=400, detail="No speech was found in the file.")
-        index_documents(chunks, source_name=filename)
+        file_bytes = await file.read(MAX_UPLOAD_BYTES + 1)
+        if len(file_bytes) > MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="The uploaded file is too large.")
+        chunks = await run_in_threadpool(process_upload, file_bytes, filename, suffix)
     except HTTPException:
         raise
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
     except Exception as error:
         raise HTTPException(status_code=500, detail=f"Could not index {filename}: {error}") from error
-    finally:
-        if temp_path:
-            os.unlink(temp_path)
 
     return {"id": upload_id, "source": filename, "chunks": len(chunks), "status": "indexed"}

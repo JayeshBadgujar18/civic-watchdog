@@ -1,10 +1,15 @@
 import os
 import uuid
+from functools import lru_cache
 from fastembed import SparseTextEmbedding, TextEmbedding
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
 from config import COLLECTION_NAME, EMBEDDING_MODEL, SPARSE_MODEL, QDRANT_PATH
 
+dense_embedding_model = TextEmbedding(model_name=EMBEDDING_MODEL)
+sparse_embedding_model = SparseTextEmbedding(model_name=SPARSE_MODEL)
+
+@lru_cache(maxsize=1)
 def get_qdrant_client():
     """
     Initializes Qdrant. Uses cloud if keys are in .env, otherwise defaults to local.
@@ -35,8 +40,8 @@ def index_documents(chunks, source_name="Unknown source"):
 
     print(f"Indexing {len(docs)} chunks into Qdrant...")
 
-    dense_embeddings = list(TextEmbedding(model_name=EMBEDDING_MODEL).embed(docs))
-    sparse_embeddings = list(SparseTextEmbedding(model_name=SPARSE_MODEL).embed(docs))
+    dense_embeddings = list(dense_embedding_model.embed(docs))
+    sparse_embeddings = list(sparse_embedding_model.embed(docs))
 
     if client.collection_exists(COLLECTION_NAME):
         collection = client.get_collection(COLLECTION_NAME)

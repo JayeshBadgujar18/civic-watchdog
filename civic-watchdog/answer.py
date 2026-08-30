@@ -12,6 +12,7 @@ from config import EMBEDDING_MODEL, SPARSE_MODEL
 reranker = TextCrossEncoder(model_name=RERANKER_MODEL) 
 dense_embedding_model = TextEmbedding(model_name=EMBEDDING_MODEL)
 sparse_embedding_model = SparseTextEmbedding(model_name=SPARSE_MODEL)
+gemini_client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
 def retrieve_and_rerank(query: str):
     """
@@ -86,10 +87,11 @@ def ask_gemini(query: str, context_chunks):
     ) 
     
     # Initialize the modern GenAI client
-    client = genai.Client(api_key=GEMINI_API_KEY)
+    if gemini_client is None:
+        raise RuntimeError("GEMINI_API_KEY is not configured.")
     
     # Generate content using the proper new syntax
-    response = client.models.generate_content(
+    response = gemini_client.models.generate_content(
         model=LLM_MODEL,
         contents=f"Context:\n{context_string}\n\nQuestion: {query}",
         config=types.GenerateContentConfig(

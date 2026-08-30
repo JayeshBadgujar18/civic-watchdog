@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -12,7 +13,14 @@ EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2" #
 SPARSE_MODEL = "Qdrant/bm25" #
 RERANKER_MODEL = "Xenova/ms-marco-MiniLM-L-6-v2" #
 LLM_MODEL = os.getenv("LLM_MODEL", "gemini-3.6-flash")
+CHUNK_LENGTH_SECONDS = int(os.getenv("CHUNK_LENGTH_SECONDS", "60"))
+CHUNK_OVERLAP_SECONDS = int(os.getenv("CHUNK_OVERLAP_SECONDS", "15"))
+TEXT_CHUNK_SIZE = int(os.getenv("TEXT_CHUNK_SIZE", "1600"))
+TEXT_CHUNK_OVERLAP = int(os.getenv("TEXT_CHUNK_OVERLAP", "240"))
+MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(500 * 1024 * 1024)))
+_cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173")
+CORS_ORIGINS = [origin.strip() for origin in _cors_origins.split(",") if origin.strip()]
 
 # Database Settings
-QDRANT_PATH = "./civic_db"
+QDRANT_PATH = str(Path(__file__).resolve().parent / "civic_db")
 COLLECTION_NAME = "city_council"
