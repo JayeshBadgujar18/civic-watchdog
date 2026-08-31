@@ -28,6 +28,11 @@ class AskRequest(BaseModel):
     query: str
 
 
+@app.get("/")
+def root():
+    return {"message": "Civic Watchdog API", "version": "0.1.0", "docs": "/docs"}
+
+
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
@@ -101,3 +106,4 @@ async def ingest(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Could not index {filename}: {error}") from error
 
     return {"id": upload_id, "source": filename, "chunks": len(chunks), "status": "indexed"}
+
