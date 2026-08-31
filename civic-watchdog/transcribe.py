@@ -1,8 +1,10 @@
 from threading import Lock
 
-from faster_whisper import WhisperModel #[cite: 1]
+from faster_whisper import WhisperModel
 
-whisper_model = WhisperModel("base", device="cpu", compute_type="int8")
+# Use the smallest viable Whisper model for a free/demo deployment.
+# This reduces RAM use substantially; the tradeoff is lower transcription quality.
+whisper_model = WhisperModel("tiny", device="cpu", compute_type="int8")
 transcription_lock = Lock()
 
 def transcribe_meeting(file_path: str):

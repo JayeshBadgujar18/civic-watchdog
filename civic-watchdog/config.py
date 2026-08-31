@@ -18,8 +18,13 @@ CHUNK_OVERLAP_SECONDS = int(os.getenv("CHUNK_OVERLAP_SECONDS", "15"))
 TEXT_CHUNK_SIZE = int(os.getenv("TEXT_CHUNK_SIZE", "1600"))
 TEXT_CHUNK_OVERLAP = int(os.getenv("TEXT_CHUNK_OVERLAP", "240"))
 MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(500 * 1024 * 1024)))
-_cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173")
-CORS_ORIGINS = [origin.strip() for origin in _cors_origins.split(",") if origin.strip()]
+_cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:8000")
+CORS_ORIGINS = [
+    origin.strip().rstrip("/")
+    for origin in _cors_origins.split(",")
+    if origin.strip()
+]
+CORS_ORIGINS = list(dict.fromkeys(CORS_ORIGINS))
 
 # Database Settings
 QDRANT_PATH = str(Path(__file__).resolve().parent / "civic_db")
