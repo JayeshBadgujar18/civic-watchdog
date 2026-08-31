@@ -25,7 +25,9 @@ CORS_ORIGINS = [
     if origin.strip()
 ]
 CORS_ORIGINS = list(dict.fromkeys(CORS_ORIGINS))
+print(f"🔍 CORS_ORIGINS loaded: {CORS_ORIGINS}")
 
 # Database Settings
 QDRANT_PATH = str(Path(__file__).resolve().parent / "civic_db")
 COLLECTION_NAME = "city_council"
+
