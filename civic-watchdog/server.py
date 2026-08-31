@@ -5,6 +5,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
@@ -101,3 +102,10 @@ async def ingest(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Could not index {filename}: {error}") from error
 
     return {"id": upload_id, "source": filename, "chunks": len(chunks), "status": "indexed"}
+
+
+# Serve frontend static files
+frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
+if frontend_dist.exists():
+    app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="static")
+
