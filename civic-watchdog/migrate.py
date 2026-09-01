@@ -9,6 +9,17 @@ def migrate_legacy_data():
         print("Collection doesn't exist. Nothing to migrate.")
         return
         
+    try:
+        from qdrant_client.http import models
+        client.create_payload_index(
+            collection_name=COLLECTION_NAME,
+            field_name="session_id",
+            field_schema=models.PayloadSchemaType.KEYWORD,
+        )
+        print("Created payload index for session_id.")
+    except Exception as e:
+        print(f"Payload index already exists or could not be created: {e}")
+        
     # Scroll and update points without a session_id
     offset = None
     migrated_count = 0

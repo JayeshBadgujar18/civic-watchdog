@@ -69,6 +69,15 @@ def index_documents(chunks, source_name="Unknown source", session_id=None):
                 "sparse": models.SparseVectorParams(modifier=models.Modifier.IDF)
             },
         )
+    
+    try:
+        client.create_payload_index(
+            collection_name=COLLECTION_NAME,
+            field_name="session_id",
+            field_schema=models.PayloadSchemaType.KEYWORD,
+        )
+    except Exception:
+        pass
 
     client.upsert(
         collection_name=COLLECTION_NAME,
