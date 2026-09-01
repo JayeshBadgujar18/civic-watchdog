@@ -12,6 +12,17 @@ if (!import.meta.env.VITE_API_URL) {
   console.warn('VITE_API_URL is not set; the frontend is using http://localhost:8000.')
 }
 
+const SESSION_KEY = 'civic_watchdog_session_id'
+function getOrCreateSessionId() {
+  let sessionId = localStorage.getItem(SESSION_KEY)
+  if (!sessionId) {
+    sessionId = crypto.randomUUID()
+    localStorage.setItem(SESSION_KEY, sessionId)
+  }
+  return sessionId
+}
+const SESSION_ID = getOrCreateSessionId()
+
 function formatTime(seconds) {
   if (!Number.isFinite(seconds)) return '00:00'
   const minutes = Math.floor(seconds / 60)
@@ -44,7 +55,7 @@ function App() {
     askInFlight.current = true
     setLoading(true); setNotice('')
     try {
-      const response = await fetch(`${API_URL}/api/ask`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: question }) })
+      const response = await fetch(`${API_URL}/api/ask`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Session-Id': SESSION_ID }, body: JSON.stringify({ query: question }) })
       const data = await response.json()
       if (!response.ok) throw new Error(data.detail || 'The watchdog could not answer.')
       setAnswer(data.answer); setCitations(data.citations || [])
@@ -68,7 +79,7 @@ function App() {
     setUploading(true); setNotice('')
     const form = new FormData(); form.append('file', file)
     try {
-      const response = await fetch(`${API_URL}/api/ingest`, { method: 'POST', body: form })
+      const response = await fetch(`${API_URL}/api/ingest`, { method: 'POST', headers: { 'X-Session-Id': SESSION_ID }, body: form })
       const data = await response.json()
       if (!response.ok) throw new Error(data.detail || 'Could not index this file.')
       setSources((current) => [{ name: data.source, chunks: data.chunks }, ...current])

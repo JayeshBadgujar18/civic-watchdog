@@ -3,7 +3,7 @@ import tempfile
 import uuid
 from pathlib import Path
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
@@ -43,12 +43,12 @@ def health():
 
 
 @app.post("/api/ask")
-def ask(request: AskRequest):
+def ask(request: AskRequest, x_session_id: str = Header(...)):
     query = request.query.strip()
     if not query:
         raise HTTPException(status_code=400, detail="Please enter a question.")
     try:
-        chunks = retrieve_and_rerank(query)
+        chunks = retrieve_and_rerank(query, session_id=x_session_id)
         answer = ask_gemini(query, chunks)
     except Exception as error:
         raise HTTPException(status_code=502, detail=str(error)) from error
@@ -65,7 +65,7 @@ def ask(request: AskRequest):
     return {"answer": answer, "citations": citations}
 
 
-def process_upload(file_bytes, filename, suffix):
+def process_upload(file_bytes, filename, suffix, session_id):
     if suffix in {".txt", ".md"}:
         text = file_bytes.decode("utf-8", errors="replace").strip()
         if not text:
@@ -85,12 +85,12 @@ def process_upload(file_bytes, filename, suffix):
             if temp_path:
                 os.unlink(temp_path)
 
-    index_documents(chunks, source_name=filename)
+    index_documents(chunks, source_name=filename, session_id=session_id)
     return chunks
 
 
 @app.post("/api/ingest")
-async def ingest(file: UploadFile = File(...)):
+async def ingest(file: UploadFile = File(...), x_session_id: str = Header(...)):
     filename = Path(file.filename or "upload").name
     suffix = Path(filename).suffix.lower()
     if suffix not in {".txt", ".md", ".mp3", ".mp4", ".wav", ".m4a", ".webm", ".mov"}:
@@ -101,7 +101,7 @@ async def ingest(file: UploadFile = File(...)):
         file_bytes = await file.read(MAX_UPLOAD_BYTES + 1)
         if len(file_bytes) > MAX_UPLOAD_BYTES:
             raise HTTPException(status_code=413, detail="The uploaded file is too large.")
-        chunks = await run_in_threadpool(process_upload, file_bytes, filename, suffix)
+        chunks = await run_in_threadpool(process_upload, file_bytes, filename, suffix, x_session_id)
     except HTTPException:
         raise
     except ValueError as error:

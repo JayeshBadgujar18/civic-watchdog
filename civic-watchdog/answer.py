@@ -14,7 +14,7 @@ dense_embedding_model = TextEmbedding(model_name=EMBEDDING_MODEL)
 sparse_embedding_model = SparseTextEmbedding(model_name=SPARSE_MODEL)
 gemini_client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
-def retrieve_and_rerank(query: str):
+def retrieve_and_rerank(query: str, session_id: str):
     """
     Executes a 2-stage retrieval: Fast hybrid search followed by deep cross-encoder reranking.
     """
@@ -23,11 +23,20 @@ def retrieve_and_rerank(query: str):
     dense_query = next(dense_embedding_model.embed([query])).tolist()
     sparse_query = next(sparse_embedding_model.embed([query]))
 
+    query_filter = models.Filter(
+        must=[
+            models.FieldCondition(
+                key="session_id",
+                match=models.MatchValue(value=session_id)
+            )
+        ]
+    )
+
     # STAGE 1: retrieve with both dense meaning and sparse keyword signals.
     candidates = client.query_points(
         collection_name=COLLECTION_NAME,
         prefetch=[
-            models.Prefetch(query=dense_query, using="dense", limit=20),
+            models.Prefetch(query=dense_query, using="dense", limit=20, filter=query_filter),
             models.Prefetch(
                 query=models.SparseVector(
                     indices=sparse_query.indices.tolist(),
@@ -35,9 +44,11 @@ def retrieve_and_rerank(query: str):
                 ),
                 using="sparse",
                 limit=20,
+                filter=query_filter,
             ),
         ],
         query=models.FusionQuery(fusion=models.Fusion.RRF),
+        query_filter=query_filter,
         limit=20,
     ).points
     
