@@ -1,4 +1,4 @@
-import { StrictMode, useRef, useState } from 'react'
+import { StrictMode, useRef, useState, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { ArrowUp, ChevronDown, FileAudio, FileText, FolderOpen, LoaderCircle, Plus, Search, Shield, Sparkles, Upload, X } from 'lucide-react'
 import './styles.css'
@@ -38,6 +38,41 @@ function formatFileSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(0)} MB`
 }
 
+function formatAnswerText(text, citations, onCitationClick) {
+  if (!text) return null;
+  const regex = /\[?(?:Source:\s*([^|\]]+?)\s*\|\s*)?Timestamp:\s*(\d+(?:\.\d+)?)s?\]?/gi;
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    const source = match[1] ? match[1].trim() : (citations[0]?.source || 'Unknown source');
+    const start = parseFloat(match[2]);
+    
+    parts.push(
+      <button 
+        key={match.index}
+        type="button"
+        onClick={() => onCitationClick({ source, start })}
+        className="mx-[3px] inline-flex items-center gap-[3px] rounded-[4px] bg-[#39765d] px-[6px] py-[2px] font-[DM_Mono] text-[13px] font-medium tracking-wide text-[#e9f0e8] hover:bg-[#4d876c] transition-colors align-baseline"
+        title={`Jump to ${formatTime(start)}`}
+        aria-label={`Jump to ${formatTime(start)}`}
+      >
+        {isMediaSource(source) ? <FileAudio size={12} /> : <FileText size={12} />}
+        {formatTime(start)}
+      </button>
+    );
+    lastIndex = regex.lastIndex;
+  }
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+  return parts.length > 0 ? parts : text;
+}
+
 function App() {
   const [question, setQuestion] = useState('')
   const [answer, setAnswer] = useState(null)
@@ -45,7 +80,14 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [notice, setNotice] = useState('')
-  const [sources, setSources] = useState([])
+  const [sources, setSources] = useState(() => {
+    const saved = localStorage.getItem('civic_watchdog_sources')
+    return saved ? JSON.parse(saved) : []
+  })
+
+  useEffect(() => {
+    localStorage.setItem('civic_watchdog_sources', JSON.stringify(sources))
+  }, [sources])
   const fileInput = useRef(null)
   const askInFlight = useRef(false)
 
@@ -120,7 +162,7 @@ function App() {
 
         <section className="mt-[52px] grid gap-[54px] lg:mt-[67px] lg:grid-cols-[minmax(0,1fr)_310px] lg:gap-[62px]">
           <div className="min-w-0">
-            {loading ? <div className="animate-pulse border-y border-[#d5ddd5] py-[46px]" aria-live="polite" aria-label="Searching the indexed record"><div className="mb-5 h-11 w-11 rounded-full bg-[#dce9dd]" /><div className="mb-3 h-7 max-w-[330px] rounded bg-[#dfe5df]" /><div className="h-4 max-w-[460px] rounded bg-[#e4e8e3]" /><div className="mt-3 h-4 max-w-[390px] rounded bg-[#e4e8e3]" /></div> : answer ? <article className="bg-[#183d35] p-[26px_22px] text-[#edf4ec] sm:p-[26px_28px]"><div className={`${mono} flex items-center gap-2 text-[11px] text-[#9ac7a8]`}><span className="grid size-[25px] place-items-center rounded-full bg-[#a9d4ad] text-[#183d35]"><Sparkles size={16} /></span>Watchdog answer</div><p className="my-[25px] font-[Fraunces] text-[23px] leading-[1.3] tracking-[-0.02em] sm:text-[27px]">{answer}</p><div className={`${mono} border-t border-[#416257] pt-[15px] text-[10px] text-[#91b2a0]`}>Generated from {citations.length} transcript {citations.length === 1 ? 'source' : 'sources'}</div></article> : <div className="border-y border-[#d5ddd5] py-[46px]"><div className="mb-5 grid size-11 place-items-center rounded-full bg-[#e3eee4] text-[#39765d]"><Search size={22} /></div><h2 className="mb-2 font-[Fraunces] text-[27px] font-medium">Your answer will appear here</h2><p className="text-[#7a867e]">Ask a question to search across every indexed meeting.</p></div>}
+            {loading ? <div className="animate-pulse border-y border-[#d5ddd5] py-[46px]" aria-live="polite" aria-label="Searching the indexed record"><div className="mb-5 h-11 w-11 rounded-full bg-[#dce9dd]" /><div className="mb-3 h-7 max-w-[330px] rounded bg-[#dfe5df]" /><div className="h-4 max-w-[460px] rounded bg-[#e4e8e3]" /><div className="mt-3 h-4 max-w-[390px] rounded bg-[#e4e8e3]" /></div> : answer ? <article className="bg-[#183d35] p-[26px_22px] text-[#edf4ec] sm:p-[26px_28px]"><div className={`${mono} flex items-center gap-2 text-[11px] text-[#9ac7a8]`}><span className="grid size-[25px] place-items-center rounded-full bg-[#a9d4ad] text-[#183d35]"><Sparkles size={16} /></span>Watchdog answer</div><p className="my-[25px] font-[Fraunces] text-[23px] leading-[1.3] tracking-[-0.02em] sm:text-[27px] whitespace-pre-wrap">{formatAnswerText(answer, citations, handleCitationClick)}</p><div className={`${mono} border-t border-[#416257] pt-[15px] text-[10px] text-[#91b2a0]`}>Generated from {citations.length} transcript {citations.length === 1 ? 'source' : 'sources'}</div></article> : <div className="border-y border-[#d5ddd5] py-[46px]"><div className="mb-5 grid size-11 place-items-center rounded-full bg-[#e3eee4] text-[#39765d]"><Search size={22} /></div><h2 className="mb-2 font-[Fraunces] text-[27px] font-medium">Your answer will appear here</h2><p className="text-[#7a867e]">Ask a question to search across every indexed meeting.</p></div>}
             {!loading && answer && citations.length === 0 && <div className="mt-4 flex items-start gap-3 border border-[#ecd9bd] bg-[#fff8ed] p-4 text-sm text-[#855d38]" role="status"><Search className="mt-0.5 shrink-0" size={17} /><span><strong className="font-semibold">No supporting evidence found.</strong> This answer was returned without matching transcript excerpts. Treat it as unverified.</span></div>}
             {citations.length > 0 && <div className="mt-11"><div className={`${mono} flex justify-between border-b border-[#cfd8d0] pb-[13px] text-[11px] text-[#51635a]`}><span>Evidence</span><span className="text-[#9ba59e]">{citations.length} excerpts</span></div>{citations.map((citation, index) => <details className="border-b border-[#d8ded8]" key={`${citation.source}-${citation.start}-${index}`} open={index === 0}><summary className="flex cursor-pointer items-center gap-3.5 px-1 py-[17px]"><button type="button" className="flex shrink-0 items-center gap-1.5 rounded-[3px] bg-[#e3eee4] px-2 py-1 font-[DM_Mono] text-[11px] text-[#39765d] hover:bg-[#d5e7d5]" onClick={(event) => { event.preventDefault(); handleCitationClick(citation) }} aria-label={`Jump to ${citation.source} at ${formatTime(citation.start)}`}>{isMediaSource(citation.source) ? <FileAudio size={12} /> : <FileText size={12} />}{formatTime(citation.start)}</button><span className="truncate text-sm text-[#4a5c53]">{isMediaSource(citation.source) ? <FileAudio className="mr-1 inline text-[#39765d]" size={14} aria-label="Audio or video source" /> : <FileText className="mr-1 inline text-[#39765d]" size={14} aria-label="Text source" />}{citation.source}</span><ChevronDown className="citation-chevron ml-auto shrink-0 text-[#8b978e] transition-transform" size={17} /></summary><p className="pb-5 pl-[45px] pr-2 text-sm leading-[1.55] text-[#68766e]">{citation.text}</p></details>)}</div>}
           </div>
