@@ -28,6 +28,15 @@ class AskRequest(BaseModel):
     query: str
 
 
+@app.get("/")
+def root():
+    return {
+        "status": "ok",
+        "service": "Civic Watchdog API",
+        "routes": ["/api/health", "/api/ask", "/api/ingest"],
+    }
+
+
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
